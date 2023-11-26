@@ -26,5 +26,7 @@ resource "terraform_data" "upload_files_on_s3" {
     aws s3 cp python.zip s3://${var.s3_xc3_bucket.id}/apprise/ ||
     echo "Failed to upload files to S3"
    EOT
+   interpreter = ["cmd", "/C"]
+   
   }
 }

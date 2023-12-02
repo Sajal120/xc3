@@ -16,6 +16,7 @@ namespace      = "abc123456"
 env            = "dev"
 region         = "ap-southeast-2"
 account_id     = "903255502505"
+account_id     = "903255502505"
 vpc_cidr_block = "10.0.0.0/16"
 public_subnet_cidr_block = {
   "ap-southeast-2a" = "10.0.0.0/24"
@@ -29,6 +30,9 @@ private_subnet_cidr_block = {
 }
 # private_subnet_cidr_block  = "10.0.100.0/24"
 allow_traffic              = ["0.0.0.0/0"] // Use your own network CIDR
+ses_email_address          = "tapaws120@gmail.com"
+creator_email              = "tapaws120@gmail.com"
+owner_email                = "tapaws120@gmail.com"
 ses_email_address          = "tapaws120@gmail.com"
 creator_email              = "tapaws120@gmail.com"
 owner_email                = "tapaws120@gmail.com"

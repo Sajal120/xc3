@@ -481,3 +481,134 @@ resource "terraform_data" "delete_zips" {
   }
 
 }
+
+
+data "aws_caller_identity" "current" {}
+
+# S3 Bucket for CUR Reports
+resource "aws_s3_bucket" "cur_bucket" {
+  provider =  aws.us_east_1
+  bucket = "xc3-cur-project-bucket-120"
+}
+
+resource "aws_s3_bucket_versioning" "cur_bucket_versioning" {
+  provider =  aws.us_east_1
+  bucket = aws_s3_bucket.cur_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# S3 Bucket Policy for specific access
+resource "aws_s3_bucket_policy" "cur_bucket_policy" {
+  provider =  aws.us_east_1
+  bucket = aws_s3_bucket.cur_bucket.id
+
+  policy = jsonencode({
+    Version = "2008-10-17",
+    Id = "Policy1335892530063",
+    Statement = [
+      {
+        Sid = "Stmt1335892150622",
+        Effect = "Allow",
+        Principal = {
+          Service = "billingreports.amazonaws.com"
+        },
+        Action = [
+          "s3:GetBucketAcl",
+          "s3:GetBucketPolicy"
+        ],
+        Resource = "arn:aws:s3:::xc3-cur-project-bucket-120",
+        Condition = {
+          StringLike = {
+            "aws:SourceArn" = "arn:aws:cur:us-east-1:${data.aws_caller_identity.current.account_id}:definition/*"
+          }
+        }
+      },
+      {
+        Sid = "Stmt1335892526596",
+        Effect = "Allow",
+        Principal = {
+          Service = "billingreports.amazonaws.com"
+        },
+        Action = "s3:PutObject",
+        Resource = "arn:aws:s3:::xc3-cur-project-bucket-120/*",
+        Condition = {
+          StringLike = {
+            "aws:SourceArn" = "arn:aws:cur:us-east-1:${data.aws_caller_identity.current.account_id}:definition/*"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# IAM Policy for Lambda, CUR and S3 Operations
+resource "aws_iam_policy" "lambda_cur_s3_policy" {
+  name        = "LambdaCURandS3FullAccessPolicy"
+  description = "Policy for Lambda access to CUR and S3 operations"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "cur:PutReportDefinition",
+          "s3:ListBucket",
+          "s3:GetBucketAcl",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketLocation",
+          "s3:PutObject"
+        ],
+        Effect = "Allow",
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+
+# IAM Role for the Lambda Function
+resource "aws_iam_role" "lambda_cur_s3_role" {
+  name = "LambdaCURandS3FullAccessRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+
+# Attach Policy to the Lambda Role
+resource "aws_iam_role_policy_attachment" "lambda_cur_s3_policy_attach" {
+  role       = aws_iam_role.lambda_cur_s3_role.name
+  policy_arn = aws_iam_policy.lambda_cur_s3_policy.arn
+}
+
+# Lambda Function for CUR Report Generation
+resource "aws_lambda_function" "cur_report_lambda" {
+  function_name    = "CURReportGenerator"
+  role             = aws_iam_role.lambda_cur_s3_role.arn
+  handler          = "main.lambda_handler"
+  runtime          = "python3.8"
+  filename         = "${path.module}/CUR_lambda_function.zip"
+  source_code_hash = filebase64sha256("${path.module}/CUR_lambda_function.zip")
+
+  environment {
+    variables = {
+      S3_BUCKET       = aws_s3_bucket.cur_bucket.bucket
+     }
+  }
+}
+
